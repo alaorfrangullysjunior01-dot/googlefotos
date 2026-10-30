@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Minhas fotos</title>
+  </head>
+  <body>
+    <p>Abrindo suas fotos…</p>
+    <script>
+      fetch('destino.txt?' + Date.now())
+        .then(r => r.text())
+        .then(url => location.replace(url.trim()))
+        .catch(() => {
+          document.body.innerHTML =
+            '<p>Não foi possível localizar sua galeria agora. Tente novamente.</p>';
+        });
+    </script>
+  </body>
+</html>
