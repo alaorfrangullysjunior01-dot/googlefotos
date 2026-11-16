@@ -16,7 +16,7 @@
     if(p.has('expirado')){localStorage.removeItem('balitu-token');return;}        // token velho: mostra o login
     if(p.has('guardar')){var tk=p.get('guardar'),ir=p.get('ir')||'/';localStorage.setItem('balitu-token',tk);destino().then(function(d){location.replace(d+ir)}).catch(function(){location.replace('entrar.html')});document.documentElement.style.visibility='hidden';return;}
     var tok=localStorage.getItem('balitu-token');
-    if(tok){document.documentElement.style.visibility='hidden';destino().then(function(d){location.replace(d+'/?token='+encodeURIComponent(tok))}).catch(function(){document.documentElement.style.visibility=''});}
+    if(tok){var ir2=p.get('volta')||'/';document.documentElement.style.visibility='hidden';destino().then(function(d){location.replace(d+'/?token='+encodeURIComponent(tok)+'&volta='+encodeURIComponent(ir2))}).catch(function(){document.documentElement.style.visibility=''});}
   }catch(e){}
 })();
 </script>
