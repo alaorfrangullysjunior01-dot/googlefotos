@@ -1,0 +1,17 @@
+{
+  "name": "Balitu Database",
+  "short_name": "Balitu",
+  "description": "Fotos, filmes, jogos, Drive e backups do Balitu Database.",
+  "start_url": "entrar.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c1125",
+  "theme_color": "#0c1125",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "balitu-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "balitu-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "balitu-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
