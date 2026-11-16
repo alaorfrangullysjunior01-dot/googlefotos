@@ -3,6 +3,23 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Entrar · Balitu Database</title><link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PHJlY3QgeD0iNiIgeT0iNiIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiByeD0iMTAiIGZpbGw9IiMxNTY1YzAiLz48cmVjdCB4PSI1MiIgeT0iNiIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiByeD0iMTAiIGZpbGw9IiNlNTM5MzUiLz48cmVjdCB4PSI2IiB5PSI1MiIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiByeD0iMTAiIGZpbGw9IiMwMDg5N2IiLz48cmVjdCB4PSI1MiIgeT0iNTIiIHdpZHRoPSIzOCIgaGVpZ2h0PSIzOCIgcng9IjEwIiBmaWxsPSIjZmI4YzAwIi8+PGNpcmNsZSBjeD0iMzEiIGN5PSIxOCIgcj0iMy42IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTEzIDM1bDktMTEgNiA3IDQtNCA2IDh6IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTY1IDE2bDEyIDktMTIgOXoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMTcgNzloMTdhNiA2IDAgMCAwIC41LTEyIDkgOSAwIDAgMC0xNy0yQTcgNyAwIDAgMCAxNyA3OXoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNzEgNjJ2MTQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzLjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjY3IiBjeT0iNzciIHI9IjQuMiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik03MSA2Mmw3IDMiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzLjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==">
+<link rel="manifest" href="balitu.webmanifest">
+<meta name="theme-color" content="#0c1125">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="balitu-icon-192.png">
+<script>
+// Abertura rápida pelo atalho fixo: entra direto se já tiver entrado antes.
+(function(){
+  var p=new URLSearchParams(location.search);
+  function destino(){return fetch('destino.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){t=(t||'').trim().replace(/\/+$/,'');if(!/^https:\/\//.test(t))throw 0;return t})}
+  try{
+    if(p.has('expirado')){localStorage.removeItem('balitu-token');return;}        // token velho: mostra o login
+    if(p.has('guardar')){var tk=p.get('guardar'),ir=p.get('ir')||'/';localStorage.setItem('balitu-token',tk);destino().then(function(d){location.replace(d+ir)}).catch(function(){location.replace('entrar.html')});document.documentElement.style.visibility='hidden';return;}
+    var tok=localStorage.getItem('balitu-token');
+    if(tok){document.documentElement.style.visibility='hidden';destino().then(function(d){location.replace(d+'/?token='+encodeURIComponent(tok))}).catch(function(){document.documentElement.style.visibility=''});}
+  }catch(e){}
+})();
+</script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *{box-sizing:border-box}
@@ -31,7 +48,7 @@ footer a{color:#a9a4c4}
     <div id="g"></div>
     <div class="msg" id="msg"></div>
     <div class="steps">
-      <p><b>Primeira vez?</b> Entre com o Google: seu pedido de acesso vai para o administrador e, depois de aprovado, é só entrar de novo.</p>
+      <p><b>Primeira vez?</b> Entre com o Google e a sua conta é criada na hora, com 1 GB para as suas fotos, vídeos e arquivos.</p>
       <p><b>Esqueceu a senha?</b> A senha é a da sua conta Google. Para recuperá-la, use “Esqueceu a senha?” na tela do próprio Google: ele envia o código para o seu e-mail ou celular.</p>
     </div>
   </div>
@@ -52,5 +69,6 @@ window.onload=()=>{
   google.accounts.id.renderButton(document.getElementById('g'),{theme:'filled_blue',size:'large',shape:'pill',text:link?'continue_with':'signin_with',locale:'pt-BR',width:300});
 };
 </script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("balitu-sw.js").catch(function(){})}</script>
 </body>
 </html>
