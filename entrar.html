@@ -8,16 +8,21 @@
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="balitu-icon-192.png">
 <script>
-// Abertura rápida pelo atalho fixo: entra direto se já tiver entrado antes.
+// Mantém o acesso compartilhado mesmo quando o endereço do servidor muda.
 (function(){
   var p=new URLSearchParams(location.search);
-  function destino(){return fetch('destino.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){t=(t||'').trim().replace(/\/+$/,'');if(!/^https:\/\//.test(t))throw 0;return t})}
+  var safeReturnPath=function safeReturnPath(value,fallback='/'){
+  if(typeof value!=='string'||!value.startsWith('/')||/^\/(?:[\/\\]|%2f|%5c)/i.test(value)||/[\\\u0000-\u0020\u007f]/.test(value))return fallback;
+  try{const url=new URL(value,'https://balitu.invalid');return url.origin==='https://balitu.invalid'?url.pathname+url.search+url.hash:fallback}catch{return fallback}
+};
+  var next=safeReturnPath(p.get('volta'));
+  function destino(){return fetch('destino.txt?'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw Error('destino');return r.text()}).then(function(t){t=t.trim().replace(/\/+$/,'');if(!/^https:\/\/[a-z0-9.-]+$/i.test(t))throw Error('destino');return t})}
   try{
-    if(p.has('expirado')){localStorage.removeItem('balitu-token');return;}        // token velho: mostra o login
-    if(p.has('guardar')){var tk=p.get('guardar'),ir=p.get('ir')||'/';localStorage.setItem('balitu-token',tk);destino().then(function(d){location.replace(d+ir)}).catch(function(){location.replace('entrar.html')});document.documentElement.style.visibility='hidden';return;}
-    var tok=localStorage.getItem('balitu-token');
-    if(tok){var ir2=p.get('volta')||'/';document.documentElement.style.visibility='hidden';destino().then(function(d){location.replace(d+'/?token='+encodeURIComponent(tok)+'&volta='+encodeURIComponent(ir2))}).catch(function(){document.documentElement.style.visibility=''});}
-  }catch(e){}
+    if(p.has('expirado')){localStorage.removeItem('balitu-token');return;}
+    var token=p.has('guardar')?p.get('guardar'):localStorage.getItem('balitu-token');
+    if(p.has('guardar')){next=safeReturnPath(p.get('ir'));localStorage.setItem('balitu-token',token);history.replaceState(null,'',location.pathname+'?volta='+encodeURIComponent(next));}
+    if(token){document.documentElement.style.visibility='hidden';destino().then(function(d){location.replace(d+'/?token='+encodeURIComponent(token)+'&volta='+encodeURIComponent(next))}).catch(function(){document.documentElement.style.visibility='';});}
+  }catch(e){document.documentElement.style.visibility='';}
 })();
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -56,7 +61,12 @@ footer a{color:#a9a4c4}
 </div>
 <script>
 const CLIENT_ID='330955968953-hkm76a032m98apcoidf3jc00m7qm15r7.apps.googleusercontent.com';
-const params=new URLSearchParams(location.search),link=params.get('link')==='1',volta=params.get('volta')||'/';
+const safeReturnPath=function safeReturnPath(value,fallback='/'){
+  if(typeof value!=='string'||!value.startsWith('/')||/^\/(?:[\/\\]|%2f|%5c)/i.test(value)||/[\\\u0000-\u0020\u007f]/.test(value))return fallback;
+  try{const url=new URL(value,'https://balitu.invalid');return url.origin==='https://balitu.invalid'?url.pathname+url.search+url.hash:fallback}catch{return fallback}
+};
+const params=new URLSearchParams(location.search),link=params.get('link')==='1',volta=safeReturnPath(params.get('volta'));
+if(!link&&volta==='/balitu-trap.html'){document.title='Jogar Balitu Trap · Balitu Database';document.getElementById('title').textContent='Balitu Trap';document.getElementById('sub').textContent='Entre com Google para jogar e disputar o ranking. Sua conta também dá acesso aos filmes e outros jogos do Balitu Database.';document.querySelector('.steps').innerHTML='<p><b>Entre e jogue.</b> Na primeira entrada, sua conta Balitu Database é criada automaticamente.</p><p><b>Seu ranking fica salvo.</b> As fases e o tempo são registrados na sua conta durante a partida.</p><p><b>Continue explorando.</b> Depois de jogar, use a mesma conta para assistir a filmes ou abrir outros jogos.</p>';}
 if(link){document.getElementById('title').textContent='Vincular conta Google';document.getElementById('sub').textContent='Escolha a conta Google que você vai usar para entrar no Balitu Database.';}
 async function destino(){const r=await fetch('destino.txt?'+Date.now(),{cache:'no-store'});const t=(await r.text()).trim();if(!/^https:\/\/[a-z0-9.-]+$/i.test(t.replace(/\/$/,'')))throw new Error('destino');return t.replace(/\/$/,'')}
 async function done(response){
