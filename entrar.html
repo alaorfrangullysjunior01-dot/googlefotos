@@ -21,7 +21,7 @@
     if(p.has('expirado')){localStorage.removeItem('balitu-token');return;}
     var token=p.has('guardar')?p.get('guardar'):localStorage.getItem('balitu-token');
     if(p.has('guardar')){next=safeReturnPath(p.get('ir'));localStorage.setItem('balitu-token',token);history.replaceState(null,'',location.pathname+'?volta='+encodeURIComponent(next));}
-    if(token){document.documentElement.style.visibility='hidden';destino().then(function(d){location.replace(d+'/?token='+encodeURIComponent(token)+'&volta='+encodeURIComponent(next))}).catch(function(){document.documentElement.style.visibility='';});}
+    if(token){document.documentElement.style.visibility='hidden';destino().then(function(d){return (function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})})(d).then(function(){location.replace(d+'/?token='+encodeURIComponent(token)+'&volta='+encodeURIComponent(next))},function(){location.replace('audiolivros.html')})}).catch(function(){document.documentElement.style.visibility='';});}
   }catch(e){document.documentElement.style.visibility='';}
 })();
 </script>
@@ -71,8 +71,8 @@ if(link){document.getElementById('title').textContent='Vincular conta Google';do
 async function destino(){const r=await fetch('destino.txt?'+Date.now(),{cache:'no-store'});const t=(await r.text()).trim();if(!/^https:\/\/[a-z0-9.-]+$/i.test(t.replace(/\/$/,'')))throw new Error('destino');return t.replace(/\/$/,'')}
 async function done(response){
   const msg=document.getElementById('msg');msg.textContent='Entrando…';
-  try{const target=await destino();const h=new URLSearchParams({c:response.credential,volta,link:link?'1':'0'});location.href=target+'/auth/google#'+h.toString();}
-  catch{msg.textContent='O servidor está desligado no momento. Tente novamente em alguns minutos.';}
+  try{const target=await destino();try{await (function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})})(target)}catch{location.href='audiolivros.html';return}const h=new URLSearchParams({c:response.credential,volta,link:link?'1':'0'});location.href=target+'/auth/google#'+h.toString();}
+  catch{location.href='audiolivros.html';}
 }
 window.onload=()=>{
   google.accounts.id.initialize({client_id:CLIENT_ID,callback:done,ux_mode:'popup',auto_select:false,cancel_on_tap_outside:true,context:'signin'});
