@@ -36,8 +36,8 @@ function token(){return new Promise((ok,no)=>{if(!window.google?.accounts?.oauth
  client=client||google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:r=>r.error?client._no(new Error('Login cancelado.')):client._ok(r),error_callback:()=>client._no(new Error('Login cancelado.'))});
  client._ok=ok;client._no=no;client.requestAccessToken({prompt:localStorage.getItem('bal-nuvem-ok')?'':'consent'})})}
 async function drive(tok,path){const r=await fetch(API+path,{headers:{Authorization:'Bearer '+tok}});if(!r.ok)throw new Error('Drive '+r.status);return r}
-async function find(tok,name){const q=encodeURIComponent(`name='${name}' and trashed=false`);const j=await (await drive(tok,`?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`)).json();return j.files?.[0]?.id||null}
-async function getJson(tok,name){const id=await find(tok,name);if(!id)return null;return (await drive(tok,'/'+id+'?alt=media')).json()}
+async function list(tok,q){const j=await (await drive(tok,'?q='+encodeURIComponent(q+' and trashed=false')+'&fields=files(id,parents,modifiedTime)&orderBy=modifiedTime desc&pageSize=20&supportsAllDrives=true&includeItemsFromAllDrives=true')).json();return j.files||[]}
+const media=async(tok,id)=>(await drive(tok,'/'+id+'?alt=media')).json();
 async function entrar(){
  const btn=document.getElementById('go');btn.disabled=true;
  try{
@@ -46,12 +46,14 @@ async function entrar(){
   msg('Conferindo a sua conta…');
   const me=await (await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tok}})).json();
   const email=String(me.email||'').toLowerCase();
-  const indice=await getJson(tok,'balitu-espelho-indice.json');
-  if(!indice){msg('Esta conta Google ('+email+') ainda não tem acesso ao Balitu Database na nuvem.');btn.disabled=false;return}
-  const conta=indice.contas.find(c=>c.emails.includes(email));
-  if(!conta){msg('A conta '+email+' não está cadastrada no Balitu Database.');btn.disabled=false;return}
+  // Cada conta só enxerga a própria pasta no Drive.
+  let conta=null,pasta=null;
+  for(const f of await list(tok,"name='balitu-espelho-conta.json'")){const c=await media(tok,f.id);if(c.emails?.includes(email)){conta=c;pasta=f.parents?.[0];break}}
+  if(!conta){msg('A conta '+email+' ainda não tem o Balitu Database na nuvem. A liberação é automática para as contas do site e leva até algumas horas depois do primeiro acesso.');btn.disabled=false;return}
   msg('Carregando o seu Balitu Database…');
-  const [man,blobs,cat]=await Promise.all([getJson(tok,'balitu-espelho-'+conta.id+'.json'),getJson(tok,'balitu-espelho-blobs.json'),getJson(tok,'catalogo.json')]);
+  const achar=async n=>{const f=(await list(tok,"name='"+n+"' and '"+pasta+"' in parents"))[0];return f?media(tok,f.id):null};
+  const catF=(await list(tok,"name='catalogo.json'"))[0];
+  const [man,blobs,cat]=await Promise.all([achar('balitu-espelho-manifesto.json'),achar('balitu-espelho-blobs.json'),catF?media(tok,catF.id):null]);
   if(!man){msg('Não encontrei a cópia da sua conta. Tente mais tarde.');btn.disabled=false;return}
   const reg=await navigator.serviceWorker.register('sw.js',{scope:'/googlefotos/nuvem/'});
   const sw=(await navigator.serviceWorker.ready).active;
