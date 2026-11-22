@@ -1,20 +1,21 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Minhas fotos</title>
-  </head>
-  <body>
-    <p>Abrindo suas fotos…</p>
-    <script>
-      fetch('destino.txt?' + Date.now())
-        .then(r => r.text())
-        .then(url => location.replace(url.trim()))
-        .catch(() => {
-          document.body.innerHTML =
-            '<p>Não foi possível localizar sua galeria agora. Tente novamente.</p>';
-        });
-    </script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balitu Database</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0c1125;color:#c5c1dc;font:15px system-ui,sans-serif}</style>
+</head>
+<body>
+<p id="m">Abrindo o Balitu Database…</p>
+<script>
+// Abre o site no PC; se o PC estiver desligado, vai para os audiolivros na nuvem.
+var pcOnline = function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})};
+fetch('destino.txt?' + Date.now(), {cache: 'no-store'})
+  .then(function (r) { return r.text(); })
+  .then(function (t) { return pcOnline(t.trim().replace(/\/+$/, '')); })
+  .then(function (url) { location.replace(url); })
+  .catch(function () { location.replace('audiolivros.html'); });
+</script>
+</body>
 </html>
