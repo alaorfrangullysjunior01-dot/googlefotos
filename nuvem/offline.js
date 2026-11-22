@@ -6,7 +6,34 @@
   var MSG = 'O servidor não está ativo no momento! :( Volte mais tarde';
   var CLIENT_ID = '330955968953-hkm76a032m98apcoidf3jc00m7qm15r7.apps.googleusercontent.com';
   var lastClick = 0, lastShown = 0;
-  addEventListener('pointerdown', function () { lastClick = Date.now(); }, true);
+  addEventListener('pointerdown', function () { lastClick = Date.now(); renovar(false); }, true);
+
+  // Renova sozinho o acesso ao Google Drive (vale 1 hora) no próximo toque na tela,
+  // sem precisar entrar de novo. Os audiolivros continuam tocando.
+  var gis = null, renovando = false;
+  function carregarGis(cb) {
+    if (window.google && google.accounts && google.accounts.oauth2) return cb();
+    if (document.getElementById('bn-gis')) return setTimeout(function () { carregarGis(cb); }, 300);
+    var sc = document.createElement('script'); sc.id = 'bn-gis'; sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = cb; document.head.appendChild(sc);
+  }
+  if (document.readyState !== 'loading') carregarGis(function () {}); else addEventListener('DOMContentLoaded', function () { carregarGis(function () {}); });
+  function renovar(forcar, depois) {
+    var exp = Number(localStorage.getItem('bal-nuvem-exp') || 0);
+    if (renovando || (!forcar && exp - Date.now() > 15 * 60000)) return;
+    if (!(window.google && google.accounts && google.accounts.oauth2)) { carregarGis(function () {}); return; }
+    renovando = true;
+    gis = gis || google.accounts.oauth2.initTokenClient({client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.readonly openid email', callback: function () {}});
+    gis.callback = function (r) {
+      renovando = false;
+      if (!r || r.error || !r.access_token) return;
+      var tokenExp = Date.now() + (Number(r.expires_in || 3600) - 60) * 1000;
+      localStorage.setItem('bal-nuvem-exp', String(tokenExp));
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({type: 'token', token: r.access_token, tokenExp: tokenExp});
+      if (depois) setTimeout(depois, 300);
+    };
+    gis.error_callback = function () { renovando = false; };
+    try { gis.requestAccessToken({prompt: '', login_hint: localStorage.getItem('bal-nuvem-email') || ''}); } catch (e) { renovando = false; }
+  }
   addEventListener('keydown', function () { lastClick = Date.now(); }, true);
 
   var css = '.bn-badge{position:fixed;left:12px;bottom:12px;z-index:2147483646;background:#0b0f22e6;color:#9ff0d4;border:1px solid #2ad1a155;border-radius:99px;padding:5px 11px;font:600 12px system-ui,sans-serif;pointer-events:none}' +
@@ -36,7 +63,8 @@
   }
   function sessao() {
     modal('Sua sessão na nuvem expirou', 'Toque para continuar de onde parou.', 'Continuar', function () {
-      location.href = '/googlefotos/nuvem/?volta=' + encodeURIComponent(location.pathname.replace(BASE, '') + location.search);
+      renovar(true, function () { location.reload(); });
+      setTimeout(function () { if (renovando || Number(localStorage.getItem('bal-nuvem-exp') || 0) < Date.now()) location.href = '/googlefotos/nuvem/?volta=' + encodeURIComponent(location.pathname.replace(BASE, '') + location.search); }, 15000);
     });
   }
   function checar(res, method, url) {
