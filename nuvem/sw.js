@@ -6,7 +6,9 @@ const BASE = '/googlefotos/nuvem/app';
 const MSG = 'O servidor não está ativo no momento! :( Volte mais tarde';
 const DRIVE = 'https://www.googleapis.com/drive/v3/files/';
 const STATE_URL = '/googlefotos/nuvem/__estado__';
-let state = null; // {token, tokenExp, user, entries, blobs, books}
+let state = null; // {token, tokenExp, user, entries, blobs, books, fb}
+const FB_KEY = 'AIzaSyAOB_pyCITzJGAX_ScV4-QE2tb5YAP_rxo';
+const FS = 'https://firestore.googleapis.com/v1/projects/balitu-database/databases/(default)/documents';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
@@ -15,9 +17,10 @@ self.addEventListener('message', e => {
     state = e.data.state;
     e.waitUntil(caches.open('balitu-nuvem').then(c => c.put(STATE_URL, new Response(JSON.stringify(state)))).then(() => e.source?.postMessage({type: 'ok'})));
   }
-  if (e.data?.type === 'token' && state) { state.token = e.data.token; state.tokenExp = e.data.tokenExp; caches.open('balitu-nuvem').then(c => c.put(STATE_URL, new Response(JSON.stringify(state)))); }
-  if (e.data?.type === 'sair') { state = null; caches.delete('balitu-nuvem'); caches.delete('balitu-arquivos'); }
+  if (e.data?.type === 'token' && state) { state.token = e.data.token; state.tokenExp = e.data.tokenExp; if (e.data.fb) state.fb = e.data.fb; saveState(); }
+  if (e.data?.type === 'sair') { state = null; caches.delete('balitu-nuvem'); caches.delete('balitu-arquivos'); caches.delete(AUDIO_CACHE); }
 });
+function saveState() { return caches.open('balitu-nuvem').then(c => c.put(STATE_URL, new Response(JSON.stringify(state)))).catch(() => {}); }
 async function loadState() {
   if (state) return state;
   const r = await (await caches.open('balitu-nuvem')).match(STATE_URL);
@@ -73,6 +76,166 @@ function readerBook(s, id) {
   return {id: b.id, title: b.title, author: b.author, synopsis: b.synopsis || '', series: b.series || '', coverUrl: '/balito-leitor/api/cover/' + b.id, shared: true, status: 'ready', readyPercent: Math.round(100 * b.parts.length / b.totalParts), preparing: b.parts.length < b.totalParts, message: 'Audiolivro · modo nuvem', parts: b.parts.map(p => ({index: p.index, status: 'ready', duration: p.duration, played: []}))};
 }
 
+// ---------- Dados ao vivo (Firebase Firestore) ----------
+async function fbToken() {
+  const s = await loadState();
+  if (!s?.fb?.refreshToken) return null;
+  if (s.fb.idToken && Date.now() < s.fb.exp) return s.fb.idToken;
+  const r = await fetch('https://securetoken.googleapis.com/v1/token?key=' + FB_KEY, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(s.fb.refreshToken)});
+  if (!r.ok) return null;
+  const j = await r.json();
+  s.fb.idToken = j.id_token; s.fb.refreshToken = j.refresh_token || s.fb.refreshToken; s.fb.exp = Date.now() + (Number(j.expires_in || 3600) - 120) * 1000;
+  saveState();
+  return s.fb.idToken;
+}
+async function fsCall(method, path, body) {
+  const t = await fbToken();
+  if (!t) throw new Error('sem sessão');
+  const r = await fetch(FS + path, {method, headers: {Authorization: 'Bearer ' + t, 'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error('Firestore ' + r.status);
+  return r.json();
+}
+const docJson = d => { try { return JSON.parse(d?.fields?.json?.stringValue || 'null'); } catch { return null; } };
+async function fsList(col) {
+  const out = []; let page = '';
+  do { const j = await fsCall('GET', '/' + col + '?pageSize=300' + (page ? '&pageToken=' + page : '')); for (const d of j?.documents || []) out.push({id: decodeURIComponent(d.name.split('/').pop()), data: docJson(d)}); page = j?.nextPageToken || ''; } while (page);
+  return out;
+}
+const fsPut = (path, data) => fsCall('PATCH', path, {fields: {json: {stringValue: JSON.stringify(data)}, atualizado: {integerValue: String(Date.now())}}});
+
+let liveBooks = null, liveBooksAt = 0, liveProgress = null, liveProgressAt = 0;
+async function booksLive() {
+  if (liveBooks && Date.now() - liveBooksAt < 60000) return liveBooks;
+  liveBooks = new Map((await fsList('audiolivros')).filter(d => d.data?.id).map(d => [d.id, d.data])); liveBooksAt = Date.now();
+  return liveBooks;
+}
+const progCol = s => '/progresso/' + encodeURIComponent(s.fb.user) + '/livros';
+async function progressLive(s) {
+  if (liveProgress && Date.now() - liveProgressAt < 15000) return liveProgress;
+  liveProgress = new Map((await fsList(progCol(s).slice(1)).catch(() => [])).map(d => [d.id, d.data || {}])); liveProgressAt = Date.now();
+  return liveProgress;
+}
+const hex = async text => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(b => b.toString(16).padStart(2, '0')).join('');
+// Mesmo formato do Reader no PC (balito-leitor/web/shared.mjs).
+async function liveItem(s, b, prog = {}) {
+  const n = b.parts.length; let ready = 0;
+  for (const p of b.parts) { if (p.status === 'ready' && p.file) ready++; else break; }
+  const preparing = ready < n;
+  const item = {nextPart: preparing ? {part: ready + 1, state: 'calculating'} : null, id: b.id, title: b.title, author: b.author, synopsis: b.synopsis || '', series: b.series || '',
+    coverUrl: BASE + '/balito-leitor/api/cover/' + b.id, ambient: b.ambient === true, created: b.created, provisional: b.provisional === true, reviewCount: b.reviewCount || 0, reviewNotice: b.reviewNotice || '',
+    shared: true, status: 'ready', readyPercent: Math.round(100 * ready / n), preparing,
+    message: preparing ? ready + ' de ' + n + ' partes disponíveis · em produção' : 'Audiolivro completo · biblioteca de todos',
+    position: prog.position,
+    parts: b.parts.map((p, i) => ({index: i, status: i < ready ? 'ready' : 'pending', duration: i < ready ? p.duration : 0, reviewCount: p.reviewCount || 0, endPercent: 100 * (i + 1) / n, played: prog.played?.[i] || []}))};
+  const second = b.secondVolumeStartsAt;
+  if (Number.isInteger(second) && second >= 2 && second <= n) {
+    const positions = [prog.position, ...Object.values(prog.volumePositions || {})];
+    item.volumes = [[0, second - 2], [second - 1, n - 1]].map(([firstIndex, lastIndex], i) => ({number: i + 1, firstIndex, lastIndex,
+      position: positions.find(p => p && Number.isInteger(p.part) && p.part >= firstIndex && p.part <= lastIndex && item.parts[p.part].status === 'ready' && Number.isFinite(p.time) && p.time >= 0)}));
+    item.bookmarkKey = (await hex((await hex(s.fb.user)) + '/' + b.id)).slice(0, 32);
+  }
+  return item;
+}
+function mergeRanges(list, max) {
+  const r = list.filter(x => Array.isArray(x) && x.length === 2 && Number.isFinite(x[0]) && Number.isFinite(x[1])).map(([a, b]) => [Math.max(0, a), Math.min(max, b)]).filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]), out = [];
+  for (const x of r) { const l = out[out.length - 1]; if (l && x[0] <= l[1] + 0.25) l[1] = Math.max(l[1], x[1]); else out.push(x); }
+  return out;
+}
+// ---------- Áudio guardado no aparelho (continua tocando mesmo depois que o acesso ao Drive vence) ----------
+const AUDIO_CACHE = 'balitu-audio', AUDIO_KEEP = 4, downloading = new Map();
+const audioKey = id => '/googlefotos/nuvem/__audio__/' + id;
+async function cachedAudio(id, request) {
+  const hit = await (await caches.open(AUDIO_CACHE)).match(audioKey(id));
+  if (!hit) return null;
+  const blob = await hit.blob(), size = blob.size, m = /bytes=(\d*)-(\d*)/.exec(request.headers.get('Range') || '');
+  if (!m) return new Response(blob, {headers: {'Content-Type': 'audio/mpeg', 'Content-Length': String(size), 'Accept-Ranges': 'bytes'}});
+  let start = m[1] === '' ? size - Number(m[2]) : Number(m[1]), end = m[1] !== '' && m[2] !== '' ? Number(m[2]) : size - 1;
+  start = Math.max(0, start); end = Math.min(size - 1, end);
+  if (start > end) return new Response(null, {status: 416, headers: {'Content-Range': 'bytes */' + size}});
+  return new Response(blob.slice(start, end + 1), {status: 206, headers: {'Content-Type': 'audio/mpeg', 'Content-Length': String(end - start + 1), 'Content-Range': `bytes ${start}-${end}/${size}`, 'Accept-Ranges': 'bytes'}});
+}
+function downloadAudio(id) {
+  if (downloading.has(id)) return downloading.get(id);
+  const job = (async () => {
+    const s = await loadState();
+    if (!s?.token || Date.now() > s.tokenExp) return;
+    const cache = await caches.open(AUDIO_CACHE);
+    if (await cache.match(audioKey(id))) return;
+    const r = await fetch(DRIVE + id + '?alt=media', {headers: {Authorization: 'Bearer ' + s.token}});
+    if (!r.ok) return;
+    await cache.put(audioKey(id), new Response(r.body, {headers: {'Content-Type': 'audio/mpeg', 'X-Saved': String(Date.now())}}));
+    const keys = await cache.keys();
+    if (keys.length > AUDIO_KEEP) {
+      const dated = await Promise.all(keys.map(async k => [k, Number((await cache.match(k)).headers.get('X-Saved') || 0)]));
+      dated.sort((a, b) => a[1] - b[1]);
+      for (const [k] of dated.slice(0, keys.length - AUDIO_KEEP)) await cache.delete(k);
+    }
+  })().catch(() => {}).finally(() => downloading.delete(id));
+  downloading.set(id, job);
+  return job;
+}
+async function playAudio(book, index, request) {
+  const part = book.parts[index];
+  if (!part?.file) return null;
+  const local = await cachedAudio(part.file, request);
+  // Baixa esta parte e a próxima em segundo plano enquanto o acesso ao Drive é válido.
+  if (!local) downloadAudio(part.file);
+  const next = book.parts[index + 1]; if (next?.file) downloading.get(part.file)?.then(() => downloadAudio(next.file)) || downloadAudio(next.file);
+  return local || (await driveFile(part.file, request, 'audio/mpeg'));
+}
+
+async function readerLive(s, path, url, request) {
+  if (!s.fb?.user) return null;
+  try {
+    if (path === '/balito-leitor/api/library' && request.method === 'GET') {
+      const [books, prog] = await Promise.all([booksLive(), progressLive(s)]);
+      const shared = await Promise.all([...books.values()].map(b => liveItem(s, b, prog.get(b.id) || {})));
+      shared.sort((a, b) => b.created - a.created);
+      // Leituras pessoais (texto em áudio) continuam vindo do PC.
+      let mine = []; const rec = s.entries['/balito-leitor/api/library'];
+      if (rec?.x) try { mine = JSON.parse(rec.x).items.filter(i => !i.shared); } catch {}
+      return json({items: [...shared, ...mine]});
+    }
+    const book = /^\/balito-leitor\/api\/book\/([a-f0-9-]{36})$/.exec(path);
+    if (book && request.method === 'GET') {
+      const b = (await booksLive()).get(book[1]); if (!b) return null;
+      return json(await liveItem(s, b, (await progressLive(s)).get(b.id) || {}));
+    }
+    const prog = /^\/balito-leitor\/api\/progress\/([a-f0-9-]{36})$/.exec(path);
+    if (prog && request.method === 'POST') {
+      const b = (await booksLive()).get(prog[1]); if (!b) return null;
+      const input = await request.clone().json().catch(() => ({}));
+      const all = await progressLive(s), cur = all.get(b.id) || {}, i = input.part;
+      const item0 = await liveItem(s, b, cur);
+      if (!Number.isInteger(i) || item0.parts[i]?.status !== 'ready' || !Array.isArray(input.played) || input.played.length > 2000) return json({error: 'Progresso inválido.'}, 400);
+      const played = item0.parts.map(p => p.played);
+      played[i] = mergeRanges([...played[i], ...input.played], item0.parts[i].duration);
+      const saved = {played, position: cur.position, volumePositions: cur.volumePositions || {}, updatedAt: Date.now()};
+      if (Number.isFinite(input.position)) {
+        saved.position = {part: i, time: Math.max(0, Math.min(input.position, item0.parts[i].duration)), updatedAt: Date.now()};
+        const v = item0.volumes?.find(v => i >= v.firstIndex && i <= v.lastIndex); if (v) saved.volumePositions[v.number] = saved.position;
+      }
+      all.set(b.id, saved);
+      fsPut(progCol(s) + '/' + b.id, saved).catch(() => {});
+      return json(await liveItem(s, b, saved));
+    }
+    const cover = /^\/balito-leitor\/api\/cover\/([a-f0-9-]{36})$/.exec(path);
+    if (cover) {
+      const b = (await booksLive()).get(cover[1]);
+      if (b?.cover) { const r = await driveFile(b.cover, request, 'image/jpeg'); if (r && r.status < 300) return r; }
+      return null;
+    }
+    const audio = /^\/balito-leitor\/api\/audio\/([a-f0-9-]{36})$/.exec(path);
+    if (audio) {
+      const b = (await booksLive()).get(audio[1]);
+      if (!b) return null;
+      return (await playAudio(b, Number(url.searchParams.get('part') || 0), request)) || offline();
+    }
+  } catch (e) { return null; }
+  return null;
+}
+
 async function handle(request) {
   const url = new URL(request.url);
   if (url.origin !== location.origin) return fetch(request);
@@ -84,6 +247,8 @@ async function handle(request) {
   const isNav = request.mode === 'navigate';
   if (!s) return isNav ? Response.redirect('/googlefotos/nuvem/?volta=' + encodeURIComponent(path + url.search), 302) : offline(401);
 
+  // Reader ao vivo: biblioteca, capas, progresso e áudio vêm do Firebase + Drive.
+  if (path.startsWith('/balito-leitor/api/')) { const live = await readerLive(s, path, url, request); if (live) return live; }
   // Audiolivros: tocam direto do Drive.
   const audio = /^\/balito-leitor\/api\/audio\/([a-f0-9-]{36})$/.exec(path);
   if (audio) {
@@ -115,4 +280,9 @@ async function handle(request) {
   if (isNav || request.destination === 'document') return offlinePage(path);
   return offline();
 }
-self.addEventListener('fetch', e => e.respondWith(handle(e.request).catch(() => offline())));
+self.addEventListener('fetch', e => {
+  const p = handle(e.request).catch(() => offline());
+  e.respondWith(p);
+  // Mantém vivo o download do audiolivro para o aparelho.
+  e.waitUntil(p.then(() => Promise.all([...downloading.values()])).catch(() => {}));
+});
