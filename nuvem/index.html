@@ -29,6 +29,19 @@ const CLIENT_ID='330955968953-hkm76a032m98apcoidf3jc00m7qm15r7.apps.googleuserco
 const SCOPE='https://www.googleapis.com/auth/drive.readonly openid email';
 const API='https://www.googleapis.com/drive/v3/files';
 const BASE='/googlefotos/nuvem/app';
+const FB_KEY='AIzaSyAOB_pyCITzJGAX_ScV4-QE2tb5YAP_rxo';
+const FS='https://firestore.googleapis.com/v1/projects/balitu-database/databases/(default)/documents';
+// Entra no Firebase com o mesmo login do Google e lê a conta do site (dados ao vivo).
+async function firebase(tok,email){
+ try{
+  const r=await (await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key='+FB_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({postBody:'access_token='+encodeURIComponent(tok)+'&providerId=google.com',requestUri:location.origin,returnSecureToken:true})})).json();
+  if(!r.idToken)return null;
+  const c=await fetch(FS+'/contas/'+encodeURIComponent(email),{headers:{Authorization:'Bearer '+r.idToken}});
+  if(!c.ok)return null;
+  const d=JSON.parse((await c.json()).fields.json.stringValue);
+  return {idToken:r.idToken,refreshToken:r.refreshToken,exp:Date.now()+(Number(r.expiresIn||3600)-120)*1000,email,user:d.user,role:d.role,permissions:d.permissions||[]};
+ }catch(e){return null}
+}
 const msg=t=>document.getElementById('msg').textContent=t;
 const volta=(()=>{const v=new URLSearchParams(location.search).get('volta')||'/';return /^\/(?!\/)[^\\\s]*$/.test(v)?v:'/'})();
 let client;
@@ -46,6 +59,8 @@ async function entrar(){
   msg('Conferindo a sua conta…');
   const me=await (await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tok}})).json();
   const email=String(me.email||'').toLowerCase();
+  const fb=await firebase(tok,email);
+  localStorage.setItem('bal-nuvem-email',email);localStorage.setItem('bal-nuvem-exp',String(tokenExp));
   // Cada conta só enxerga a própria pasta no Drive.
   let conta=null,pasta=null;
   for(const f of await list(tok,"name='balitu-espelho-conta.json'")){const c=await media(tok,f.id);if(c.emails?.includes(email)){conta=c;pasta=f.parents?.[0];break}}
@@ -57,7 +72,7 @@ async function entrar(){
   if(!man){msg('Não encontrei a cópia da sua conta. Tente mais tarde.');btn.disabled=false;return}
   const reg=await navigator.serviceWorker.register('sw.js',{scope:'/googlefotos/nuvem/'});
   const sw=(await navigator.serviceWorker.ready).active;
-  await new Promise(ok=>{navigator.serviceWorker.addEventListener('message',e=>e.data?.type==='ok'&&ok(),{once:true});sw.postMessage({type:'estado',state:{token:tok,tokenExp,user:conta.user,entries:man.entries,blobs:blobs||{},books:cat?.books||[],created:man.created}})});
+  await new Promise(ok=>{navigator.serviceWorker.addEventListener('message',e=>e.data?.type==='ok'&&ok(),{once:true});sw.postMessage({type:'estado',state:{token:tok,tokenExp,fb,user:conta.user,entries:man.entries,blobs:blobs||{},books:cat?.books||[],created:man.created}})});
   location.replace(BASE+volta);
  }catch(e){msg(e.message||'Não foi possível entrar.');btn.disabled=false}
 }
