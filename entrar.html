@@ -8,6 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="balitu-icon-192.png">
 <script>
+window.balituPc=function(d){var p=function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})};return new Promise(function(ok,no){var f=0,l=[p(d),p('http://127.0.0.1:8793')];l.forEach(function(x){x.then(ok,function(){if(++f===2)no()})})})};
 // Mantém o acesso compartilhado mesmo quando o endereço do servidor muda.
 (function(){
   var p=new URLSearchParams(location.search);
@@ -21,7 +22,7 @@
     if(p.has('expirado')){localStorage.removeItem('balitu-token');return;}
     var token=p.has('guardar')?p.get('guardar'):localStorage.getItem('balitu-token');
     if(p.has('guardar')){next=safeReturnPath(p.get('ir'));localStorage.setItem('balitu-token',token);history.replaceState(null,'',location.pathname+'?volta='+encodeURIComponent(next));}
-    if(token){document.documentElement.style.visibility='hidden';destino().then(function(d){return (function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})})(d).then(function(){location.replace(d+'/?token='+encodeURIComponent(token)+'&volta='+encodeURIComponent(next))},function(){location.replace('audiolivros.html')})}).catch(function(){document.documentElement.style.visibility='';});}
+    if(token){document.documentElement.style.visibility='hidden';destino().then(function(d){return window.balituPc(d).then(function(u){location.replace(u+'/?token='+encodeURIComponent(token)+'&volta='+encodeURIComponent(next))},function(){location.replace('nuvem/?volta='+encodeURIComponent(next))})}).catch(function(){document.documentElement.style.visibility='';});}
   }catch(e){document.documentElement.style.visibility='';}
 })();
 </script>
@@ -71,8 +72,8 @@ if(link){document.getElementById('title').textContent='Vincular conta Google';do
 async function destino(){const r=await fetch('destino.txt?'+Date.now(),{cache:'no-store'});const t=(await r.text()).trim();if(!/^https:\/\/[a-z0-9.-]+$/i.test(t.replace(/\/$/,'')))throw new Error('destino');return t.replace(/\/$/,'')}
 async function done(response){
   const msg=document.getElementById('msg');msg.textContent='Entrando…';
-  try{const target=await destino();try{await (function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})})(target)}catch{location.href='audiolivros.html';return}const h=new URLSearchParams({c:response.credential,volta,link:link?'1':'0'});location.href=target+'/auth/google#'+h.toString();}
-  catch{location.href='audiolivros.html';}
+  try{const target=await destino();let alvo;try{alvo=await window.balituPc(target)}catch{location.href='nuvem/?volta='+encodeURIComponent(volta);return}const h=new URLSearchParams({c:response.credential,volta,link:link?'1':'0'});location.href=alvo+'/auth/google#'+h.toString();}
+  catch{location.href='nuvem/?volta='+encodeURIComponent(volta);}
 }
 window.onload=()=>{
   google.accounts.id.initialize({client_id:CLIENT_ID,callback:done,ux_mode:'popup',auto_select:false,cancel_on_tap_outside:true,context:'signin'});
