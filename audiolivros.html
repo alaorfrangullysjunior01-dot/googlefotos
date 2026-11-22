@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Audiolivros · Balitu Database</title>
+<meta name="theme-color" content="#0c1125">
+<link rel="manifest" href="balitu.webmanifest">
+<link rel="apple-touch-icon" href="balitu-icon-192.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#0c1125;--card:#ffffff0f;--line:#ffffff1f;--txt:#fff;--sub:#c5c1dc;--acc:#ff4b62;--acc2:#9c4dff}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 85% 0,#692b54 0,transparent 38%),radial-gradient(circle at 0 100%,#22336b 0,transparent 40%),linear-gradient(145deg,#0c1125,#191238 60%,#0c1125) fixed;color:var(--txt);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding-bottom:calc(140px + env(safe-area-inset-bottom))}
+button{font:inherit;color:inherit;cursor:pointer}
+header{display:flex;align-items:center;gap:10px;padding:14px 18px;max-width:1100px;margin:0 auto}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px}
+.badge{font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:3px 9px;border-radius:99px;background:#2ad1a11f;color:#7ff0cc;border:1px solid #2ad1a155}
+header .sp{flex:1}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:99px;padding:7px 14px;font-size:13.5px;color:var(--sub)}
+.ghost:hover{color:#fff;border-color:#fff6}
+main{max-width:1100px;margin:0 auto;padding:4px 18px}
+.notice{background:#ffffff0a;border:1px solid var(--line);border-radius:14px;padding:12px 16px;color:var(--sub);font-size:14px;margin:4px 0 18px}
+.notice b{color:#fff}
+.center{min-height:60vh;display:grid;place-items:center;text-align:center}
+.box{width:min(100%,420px);background:var(--card);border:1px solid var(--line);border-radius:22px;padding:30px 24px;box-shadow:0 20px 60px #0006}
+.box h1{font-size:24px;margin:0 0 6px}.box p{color:var(--sub);margin:0 0 22px}
+.btn{background:linear-gradient(135deg,var(--acc),var(--acc2));border:0;border-radius:99px;padding:12px 22px;font-weight:700;color:#fff}
+.msg{margin-top:14px;color:#ffd5db;font-size:14px;min-height:20px}
+h2{font-size:18px;margin:6px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:18px}
+.book{background:none;border:0;padding:0;text-align:left}
+.book .cv{aspect-ratio:480/680;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px #0007;transition:transform .15s}
+.book:hover .cv{transform:translateY(-3px)}
+.book .cv svg{width:100%;height:100%;display:block}
+.book .t{font-weight:700;margin-top:8px;font-size:14.5px;line-height:1.3}
+.book .a{color:var(--sub);font-size:12.5px}
+.bar{height:4px;border-radius:9px;background:#ffffff22;margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.detail{display:grid;grid-template-columns:minmax(140px,240px) 1fr;gap:24px;align-items:start}
+@media(max-width:640px){.detail{grid-template-columns:1fr}.detail .cv{max-width:200px;margin:0 auto}}
+.detail .cv{border-radius:14px;overflow:hidden;box-shadow:0 14px 40px #0008}.detail .cv svg{width:100%;display:block}
+.detail h1{margin:0;font-size:26px;line-height:1.2}.detail .a{color:var(--sub);margin:4px 0 2px}.detail .s{color:#b8b3d6;font-size:13.5px}
+.syn{color:#d6d3e6;font-size:14px;margin:12px 0}
+.tabs{display:flex;gap:8px;margin:14px 0 8px;flex-wrap:wrap}
+.tabs button{background:#ffffff10;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:13px}
+.tabs button.on{background:#fff;color:#191238;border-color:#fff}
+.parts{display:grid;gap:6px;margin-top:8px}
+.part{display:flex;align-items:center;gap:12px;background:#ffffff0a;border:1px solid transparent;border-radius:12px;padding:10px 14px;text-align:left}
+.part:hover{border-color:var(--line)}.part.on{border-color:#ff4b6299;background:#ff4b6214}
+.part .n{width:26px;height:26px;border-radius:99px;display:grid;place-items:center;background:#ffffff14;font-size:12px;font-weight:700;flex:none}
+.part .l{flex:1}.part .d{color:var(--sub);font-size:12.5px}
+.muted{color:var(--sub);font-size:13px}
+#player{position:fixed;left:0;right:0;bottom:0;background:#0b0f22f2;backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:10px 16px calc(12px + env(safe-area-inset-bottom));display:none;z-index:5}
+#player .in{max-width:1100px;margin:0 auto}
+#player .row{display:flex;align-items:center;gap:12px}
+#player .info{flex:1;min-width:0}#player .info b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}#player .info span{color:var(--sub);font-size:12.5px}
+.ctl{background:#ffffff12;border:0;border-radius:99px;width:42px;height:42px;display:grid;place-items:center;font-size:13px;font-weight:700}
+.play{width:52px;height:52px;background:#fff;color:#191238;font-size:20px}
+#seek{width:100%;accent-color:var(--acc);margin:6px 0 0}
+.times{display:flex;justify-content:space-between;color:var(--sub);font-size:12px}
+#speed{background:#ffffff12;border:0;border-radius:99px;height:34px;padding:0 10px;font-size:13px;font-weight:700}
+#resume{display:none;margin-top:8px;width:100%}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><svg width="32" height="32" viewBox="0 0 96 96"><rect x="6" y="6" width="38" height="38" rx="10" fill="#1565c0"/><rect x="52" y="6" width="38" height="38" rx="10" fill="#e53935"/><rect x="6" y="52" width="38" height="38" rx="10" fill="#00897b"/><rect x="52" y="52" width="38" height="38" rx="10" fill="#fb8c00"/></svg> Audiolivros</div>
+  <span class="badge">MODO NUVEM</span><span class="sp"></span>
+  <button class="ghost" id="full" title="Tentar abrir o Balitu Database completo">Site completo ↗</button>
+</header>
+<main id="app"></main>
+<div id="player"><div class="in">
+  <div class="row">
+    <button class="ctl" id="b15" title="Voltar 15 s">−15</button>
+    <button class="ctl play" id="pp" title="Tocar/pausar">▶</button>
+    <button class="ctl" id="f30" title="Avançar 30 s">+30</button>
+    <div class="info"><b id="pt"></b><span id="ps"></span></div>
+    <select id="speed" title="Velocidade"></select>
+  </div>
+  <input id="seek" type="range" min="0" max="1000" value="0">
+  <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+  <button class="btn" id="resume">Toque para continuar ouvindo</button>
+</div></div>
+<audio id="au" preload="auto"></audio>
+<script>
+'use strict';
+const CLIENT_ID='330955968953-hkm76a032m98apcoidf3jc00m7qm15r7.apps.googleusercontent.com';
+const SCOPE='https://www.googleapis.com/auth/drive.readonly';
+const API='https://www.googleapis.com/drive/v3/files';
+const $=s=>document.querySelector(s),app=$('#app'),au=$('#au');
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const esc=s=>String(s??'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>{s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+let token=null,tokenExp=0,tokenClient=null,pendingToken=null,catalog=null,book=null,partIdx=0,saveTimer=0,blobUrl=null;
+
+// ---------- Capa (mesmo desenho do Balitu Reader) ----------
+function cover(b){const words=String(b.title||'Audiolivro').split(/\s+/),lines=[];let line='';for(const w of words){if((line+' '+w).trim().length>17&&line){lines.push(line);line=w}else line=(line+' '+w).trim()}if(line)lines.push(line);
+return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 680"><defs><linearGradient id="bg'+b.id+'" x2="1" y2="1"><stop stop-color="#183c38"/><stop offset="1" stop-color="#08181d"/></linearGradient></defs><rect width="480" height="680" fill="url(#bg'+b.id+')"/><circle cx="245" cy="325" r="200" fill="#8ca38a" fill-opacity=".12"/><path d="M0 530L65 408 107 454 170 333 209 391 290 293 355 418 408 360 480 458V680H0Z" fill="#12292a"/><path d="M56 600V344H88V310H108V344H128V600M308 600V380H340V352H360V380H388V600" fill="#071c20"/><path d="M0 590Q200 480 480 578V680H0" fill="#071619"/><rect x="24" y="24" width="432" height="632" rx="2" fill="none" stroke="#9ba780" stroke-opacity=".5"/><text x="240" y="71" fill="#c8cfaa" text-anchor="middle" font-family="sans-serif" font-size="13" letter-spacing="4">BALITU · AUDIOLIVROS</text>'+lines.slice(0,5).map((t,i)=>'<text x="240" y="'+(142+i*53)+'" text-anchor="middle" fill="#f2e8c6" font-family="Georgia,serif" font-size="43">'+esc(t)+'</text>').join('')+'<text x="240" y="617" text-anchor="middle" fill="#c5cdb1" font-family="sans-serif" font-size="19">'+esc(b.author)+'</text></svg>'}
+
+// ---------- Login Google (só leitura do Drive) ----------
+function initClient(){if(tokenClient||!window.google?.accounts?.oauth2)return !!tokenClient;
+ tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:r=>{const p=pendingToken;pendingToken=null;if(r.error){p?.reject(new Error(r.error));return}token=r.access_token;tokenExp=Date.now()+(r.expires_in-60)*1000;sessionStorage.setItem('bal-tok',JSON.stringify({token,tokenExp}));p?.resolve(token)},error_callback:e=>{const p=pendingToken;pendingToken=null;p?.reject(new Error(e?.type||'popup'))}});return true}
+function askToken(){return new Promise((resolve,reject)=>{if(!initClient())return reject(new Error('google'));pendingToken={resolve,reject};tokenClient.requestAccessToken({prompt:store.get('bal-ok',false)?'':'consent',login_hint:store.get('bal-email','')||undefined})})}
+const fresh=()=>token&&Date.now()<tokenExp;
+try{const t=JSON.parse(sessionStorage.getItem('bal-tok'));if(t&&Date.now()<t.tokenExp){token=t.token;tokenExp=t.tokenExp}}catch{}
+
+async function drive(path,opt={}){const r=await fetch(API+path,{...opt,headers:{Authorization:'Bearer '+token,...(opt.headers||{})}});if(r.status===401){token=null;throw Object.assign(new Error('auth'),{auth:true})}if(!r.ok)throw new Error('drive '+r.status);return r}
+
+// ---------- Telas ----------
+function loginScreen(msg=''){
+ app.innerHTML='<div class="center"><div class="box"><h1>Seus audiolivros</h1><p>O PC do Balitu Database está desligado agora, mas os audiolivros continuam aqui. Entre com a sua conta Google para ouvir.</p><button class="btn" id="go">Entrar com Google</button><div class="msg" id="m">'+esc(msg)+'</div></div></div>';
+ $('#go').onclick=async()=>{$('#m').textContent='Abrindo o Google…';try{await askToken();store.set('bal-ok',true);await loadCatalog()}catch(e){$('#m').textContent=e.message==='google'?'Carregando o Google, tente de novo em 2 segundos.':'Não foi possível entrar. Tente de novo.'}};
+}
+async function loadCatalog(){
+ app.innerHTML='<div class="center"><div class="muted">Carregando sua biblioteca…</div></div>';
+ try{
+  const q=encodeURIComponent("name='catalogo.json' and trashed=false");
+  const list=await (await drive('?q='+q+'&fields=files(id,modifiedTime)&orderBy=modifiedTime desc&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true')).json();
+  if(!list.files?.length){app.innerHTML='<div class="center"><div class="box"><h1>Sem acesso</h1><p>Esta conta Google ainda não tem acesso aos audiolivros. A liberação é automática para as contas do Balitu Database e pode levar até 30 minutos depois do primeiro login no site.</p><button class="btn" id="other">Usar outra conta</button></div></div>';$('#other').onclick=()=>{store.set('bal-ok',false);token=null;sessionStorage.removeItem('bal-tok');loginScreen()};return}
+  catalog=await (await drive('/'+list.files[0].id+'?alt=media')).json();
+  const want=new URLSearchParams(location.hash.slice(1)).get('livro');
+  const b=want&&catalog.books.find(x=>x.id===want);b?openBook(b,false):library();
+ }catch(e){if(e.auth)return loginScreen('Sua sessão expirou. Entre de novo.');app.innerHTML='<div class="center"><div class="box"><h1>Ops</h1><p>Não consegui abrir a biblioteca agora. Verifique a internet e tente de novo.</p><button class="btn" onclick="loadCatalog()">Tentar de novo</button></div></div>'}
+}
+function progressOf(b){const p=store.get('bal-prog-'+b.id,null);if(!p)return 0;const tot=b.parts.reduce((a,x)=>a+x.duration,0),done=b.parts.slice(0,p.part).reduce((a,x)=>a+x.duration,0)+(p.time||0);return tot?Math.min(100,100*done/tot):0}
+function library(){
+ history.replaceState(null,'','#');
+ const books=catalog.books;
+ app.innerHTML='<div class="notice"><b>Seu PC está desligado.</b> Por enquanto só os audiolivros estão disponíveis. O progresso fica salvo neste aparelho.</div><h2>Biblioteca · '+books.length+' audiolivro'+(books.length===1?'':'s')+'</h2><div class="grid">'+books.map((b,i)=>{const pr=progressOf(b);return '<button class="book" data-i="'+i+'"><div class="cv">'+cover(b)+'</div><div class="t">'+esc(b.title)+'</div><div class="a">'+esc(b.author)+'</div>'+(pr>0?'<div class="bar"><i style="width:'+pr.toFixed(1)+'%"></i></div>':'')+'</button>'}).join('')+'</div>';
+ app.querySelectorAll('.book').forEach(el=>el.onclick=()=>openBook(books[+el.dataset.i],true));
+}
+function volumes(b){const s=b.secondVolumeStartsAt;if(!Number.isInteger(s)||s<2||s>b.totalParts)return null;return [[0,s-2],[s-1,b.totalParts-1]]}
+function openBook(b,user){
+ history.replaceState(null,'','#livro='+b.id);
+ const p=store.get('bal-prog-'+b.id,{part:0,time:0}),vols=volumes(b);
+ let vol=vols?vols.findIndex(([a,z])=>p.part>=a&&p.part<=z):-1;if(vol<0)vol=0;
+ const missing=b.totalParts-b.parts.length;
+ const render=()=>{
+  const range=vols?vols[vol]:[0,b.parts.length-1],list=b.parts.filter(x=>x.index>=range[0]&&x.index<=range[1]);
+  app.innerHTML='<button class="ghost" id="back">← Biblioteca</button><div class="detail" style="margin-top:16px"><div class="cv">'+cover(b)+'</div><div><h1>'+esc(b.title)+'</h1><div class="a">'+esc(b.author)+'</div>'+(b.series?'<div class="s">'+esc(b.series)+'</div>':'')+(b.synopsis?'<div class="syn">'+esc(b.synopsis)+'</div>':'')+
+  '<button class="btn" id="cont">'+(p.part||p.time?'▶ Continuar · parte '+(p.part+1)+' · '+fmt(p.time):'▶ Começar a ouvir')+'</button>'+
+  (vols?'<div class="tabs">'+vols.map((_,i)=>'<button data-v="'+i+'" class="'+(i===vol?'on':'')+'">Volume '+(i+1)+'</button>').join('')+'</div>':'')+
+  (missing>0?'<div class="muted" style="margin-top:10px">'+b.parts.length+' de '+b.totalParts+' partes na nuvem · as próximas chegam quando o PC terminar de produzir.</div>':'')+
+  '<div class="parts">'+list.map(x=>'<button class="part'+(book?.id===b.id&&partIdx===x.index?' on':'')+'" data-p="'+x.index+'"><span class="n">'+(x.index+1)+'</span><span class="l">Parte '+(x.index+1)+'</span><span class="d">'+fmt(x.duration)+'</span></button>').join('')+'</div></div></div>';
+  $('#back').onclick=library;
+  $('#cont').onclick=()=>play(b,p.part,p.time);
+  app.querySelectorAll('[data-v]').forEach(el=>el.onclick=()=>{vol=+el.dataset.v;render()});
+  app.querySelectorAll('[data-p]').forEach(el=>el.onclick=()=>{const i=+el.dataset.p;play(b,i,i===p.part?p.time:0)});
+ };render();scrollTo(0,0);
+}
+
+// ---------- Player ----------
+const speeds=[0.75,1,1.25,1.5,1.75,2,2.5,3];$('#speed').innerHTML=speeds.map(s=>'<option value="'+s+'">'+String(s).replace('.',',')+'×</option>').join('');$('#speed').value=String(store.get('bal-speed',1));
+$('#speed').onchange=()=>{au.playbackRate=+$('#speed').value;store.set('bal-speed',+$('#speed').value)};
+function partFile(i){return book.parts.find(x=>x.index===i)}
+function srcFor(f){return API+'/'+f.file+'?alt=media&access_token='+encodeURIComponent(token)}
+async function play(b,i,t=0){
+ book=b;partIdx=i;const f=partFile(i);if(!f)return;
+ $('#player').style.display='block';$('#resume').style.display='none';
+ $('#pt').textContent=b.title;$('#ps').textContent='Parte '+(i+1)+' de '+b.totalParts;
+ if(!fresh()){try{await askToken()}catch{$('#resume').style.display='block';return}}
+ if(blobUrl){URL.revokeObjectURL(blobUrl);blobUrl=null}
+ au.dataset.fallback='';au.src=srcFor(f);au.currentTime=0;au.dataset.start=t;au.playbackRate=+$('#speed').value;
+ try{await au.play()}catch{$('#pp').textContent='▶'}
+ mediaMeta();app.querySelectorAll('.part').forEach(el=>el.classList.toggle('on',+el.dataset.p===i));
+}
+au.addEventListener('loadedmetadata',()=>{const s=+au.dataset.start||0;if(s>0&&s<au.duration)au.currentTime=s;au.dataset.start=0;au.playbackRate=+$('#speed').value;$('#dur').textContent=fmt(au.duration)});
+au.addEventListener('play',()=>$('#pp').textContent='❚❚');au.addEventListener('pause',()=>{$('#pp').textContent='▶';save()});
+au.addEventListener('timeupdate',()=>{if(!seeking&&au.duration)$('#seek').value=Math.round(1000*au.currentTime/au.duration);$('#cur').textContent=fmt(au.currentTime);if(Date.now()-saveTimer>5000)save()});
+au.addEventListener('ended',()=>{const next=partFile(partIdx+1);if(next)play(book,partIdx+1,0);else{store.set('bal-prog-'+book.id,{part:partIdx,time:au.duration||0,at:Date.now()});$('#ps').textContent=partIdx+1<book.totalParts?'Fim das partes na nuvem por enquanto.':'Fim do audiolivro.'}});
+au.addEventListener('error',async()=>{
+ if(!book)return;const f=partFile(partIdx),at=au.currentTime||+au.dataset.start||0;
+ // Token vencido: pede um novo (precisa de um toque) e retoma no mesmo ponto.
+ if(!fresh()){save(at);$('#resume').style.display='block';$('#resume').onclick=()=>play(book,partIdx,at);return}
+ if(au.dataset.fallback)return;au.dataset.fallback='1';
+ // Plano B: baixa a parte inteira com o login no cabeçalho e toca do aparelho.
+ $('#ps').textContent='Parte '+(partIdx+1)+' · carregando…';
+ try{const r=await drive('/'+f.file+'?alt=media');blobUrl=URL.createObjectURL(await r.blob());au.src=blobUrl;au.dataset.start=at;await au.play();$('#ps').textContent='Parte '+(partIdx+1)+' de '+book.totalParts}
+ catch(e){$('#ps').textContent='Não consegui tocar esta parte.';if(e.auth){$('#resume').style.display='block';$('#resume').onclick=()=>play(book,partIdx,at)}}
+});
+function save(at){if(!book)return;saveTimer=Date.now();store.set('bal-prog-'+book.id,{part:partIdx,time:at??au.currentTime??0,at:Date.now()})}
+let seeking=false;$('#seek').oninput=()=>{seeking=true;if(au.duration)$('#cur').textContent=fmt(au.duration*$('#seek').value/1000)};
+$('#seek').onchange=()=>{seeking=false;if(au.duration)au.currentTime=au.duration*$('#seek').value/1000};
+$('#pp').onclick=()=>{if(!book)return;if(au.paused){if(!au.src||$('#resume').style.display==='block'){const p=store.get('bal-prog-'+book.id,{part:partIdx,time:0});play(book,p.part,p.time)}else au.play()}else au.pause()};
+$('#b15').onclick=()=>au.currentTime=Math.max(0,au.currentTime-15);$('#f30').onclick=()=>au.currentTime=Math.min(au.duration||0,au.currentTime+30);
+function mediaMeta(){if(!('mediaSession' in navigator))return;navigator.mediaSession.metadata=new MediaMetadata({title:book.title+' · parte '+(partIdx+1),artist:book.author||'',album:book.series||'Balitu Audiolivros',artwork:[{src:'balitu-icon-512.png',sizes:'512x512',type:'image/png'}]});
+ const ms=navigator.mediaSession;ms.setActionHandler('play',()=>au.play());ms.setActionHandler('pause',()=>au.pause());ms.setActionHandler('seekbackward',()=>$('#b15').click());ms.setActionHandler('seekforward',()=>$('#f30').click());ms.setActionHandler('nexttrack',()=>partFile(partIdx+1)&&play(book,partIdx+1,0));ms.setActionHandler('previoustrack',()=>partFile(partIdx-1)&&play(book,partIdx-1,0))}
+addEventListener('pagehide',()=>save());
+
+// ---------- Voltar para o site completo quando o PC ligar ----------
+async function pcOnline(){try{const d=(await (await fetch('destino.txt?'+Date.now(),{cache:'no-store'})).text()).trim().replace(/\/+$/,'');if(!/^https:\/\/[a-z0-9.-]+$/i.test(d))return null;return await (function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})})(d)}catch{return null}}
+$('#full').onclick=async()=>{$('#full').textContent='Verificando…';const d=await pcOnline();if(d)location.href='index.html';else{$('#full').textContent='PC ainda desligado';setTimeout(()=>$('#full').textContent='Site completo ↗',3000)}};
+
+// ---------- Início ----------
+function start(){if(fresh())loadCatalog();else loginScreen()}
+window.addEventListener('load',()=>{initClient();start()});
+</script>
+</body>
+</html>
