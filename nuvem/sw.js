@@ -99,7 +99,7 @@ async function fsCall(method, path, body) {
 const docJson = d => { try { return JSON.parse(d?.fields?.json?.stringValue || 'null'); } catch { return null; } };
 async function fsList(col) {
   const out = []; let page = '';
-  do { const j = await fsCall('GET', '/' + col + '?pageSize=300' + (page ? '&pageToken=' + page : '')); for (const d of j?.documents || []) out.push({id: decodeURIComponent(d.name.split('/').pop()), data: docJson(d)}); page = j?.nextPageToken || ''; } while (page);
+  do { const j = await fsCall('GET', '/' + col + '?pageSize=300' + (page ? '&pageToken=' + page : '')); for (const d of j?.documents || []) out.push({id: decodeURIComponent(d.name.split('/').pop()), data: docJson(d), at: Number(d.fields?.atualizado?.integerValue || 0)}); page = j?.nextPageToken || ''; } while (page);
   return out;
 }
 const fsPut = (path, data) => fsCall('PATCH', path, {fields: {json: {stringValue: JSON.stringify(data)}, atualizado: {integerValue: String(Date.now())}}});
@@ -237,6 +237,61 @@ async function readerLive(s, path, url, request) {
   return null;
 }
 
+// ---------- Painel de gestão (usuários e permissões) ao vivo ----------
+const AREAS = ['photos', 'files', 'streaming', 'balituflix', 'games'];
+function applyChange(L, c) {
+  const user = String(c.user || '').trim(), find = u => L.users.find(x => x.user === u);
+  const setGoogle = (u, v) => { if (typeof v !== 'string') return; const e = v.trim().toLowerCase(); for (const x of L.users) x.google = x.user === u ? (e ? [e] : []) : (x.google || []).filter(g => g !== e); };
+  if (c.type === 'save') { const t = find(user); if (t) { t.permissions = c.permissions; if (typeof c.google === 'string') setGoogle(user, c.google); } }
+  else if (c.type === 'create') { L.users.push({user, permissions: c.permissions, fixed: false, google: c.google ? [c.google.trim().toLowerCase()] : [], created: c.at}); }
+  else if (c.type === 'delete') L.users = L.users.filter(x => x.user !== user);
+  else if (c.type === 'approve') { const p = L.pending.find(x => x.user === user); if (p) { L.pending = L.pending.filter(x => x.user !== user); L.users.push({user: c.newUser || user, permissions: c.permissions, fixed: false, google: p.email ? [p.email] : [], created: c.at}); } }
+  else if (c.type === 'reject') L.pending = L.pending.filter(x => x.user !== user);
+  else if (c.type === 'dismiss-reset') L.resets = (L.resets || []).filter(x => x.user !== user);
+  else if (c.type === 'master-email-remove') L.masterEmails = (L.masterEmails || []).filter(e => e !== String(c.email || '').toLowerCase());
+}
+async function adminListing(s) {
+  const docs = await fsList('usuarios');
+  const painelDoc = docs.find(d => d.id === '_painel'), painel = painelDoc?.data || {areas: AREAS, master: 'jucabalitu', masterEmails: [], resets: []};
+  const L = {areas: painel.areas || AREAS, master: painel.master, masterEmails: painel.masterEmails || [], resets: painel.resets || [], nuvem: true,
+    users: docs.filter(d => d.data && !d.data.pending && !d.id.startsWith('_') && d.data.user !== painel.master).map(d => ({user: d.data.user, permissions: d.data.permissions || [], fixed: !!d.data.fixed, google: d.data.emails || [], created: d.data.created || null})),
+    pending: docs.filter(d => d.data?.pending).map(d => { const {pending, ...item} = d.data; return item; })};
+  // Mudanças feitas aqui que o PC ainda não aplicou.
+  s.adminPending = (s.adminPending || []).filter(c => c.at > (painelDoc?.at || 0));
+  for (const c of s.adminPending) applyChange(L, c);
+  return L;
+}
+async function adminLive(s, path, request) {
+  if (!path.startsWith('/api/master/users') && path !== '/api/master/permissions') return null;
+  if (!s.fb?.user) return null;
+  if (s.fb.role !== 'master') return json({error: 'Somente o administrador pode abrir o painel de gestão.'}, 403);
+  try {
+    if (request.method === 'GET') {
+      const L = await adminListing(s);
+      return json(path === '/api/master/permissions' ? {users: L.users.map(u => ({user: u.user, permissions: u.permissions}))} : L);
+    }
+    if (request.method !== 'POST') return json({error: 'Método não permitido.'}, 405);
+    const data = await request.clone().json().catch(() => ({}));
+    const action = path === '/api/master/permissions' ? 'save' : path.split('/').pop();
+    if (typeof data.password === 'string' && data.password) return json({error: 'Trocar ou criar senha precisa do PC ligado. As outras mudanças funcionam na nuvem.'}, 400);
+    const user = String(data.user || '').trim(), permissions = (Array.isArray(data.permissions) ? data.permissions : []).filter(a => AREAS.includes(a));
+    if (!['save', 'create', 'delete', 'approve', 'reject', 'dismiss-reset', 'master-email-remove'].includes(action)) return json({error: 'Ação desconhecida.'}, 404);
+    if (action === 'create') {
+      if (!/^[A-Za-z0-9._-]{3,30}$/.test(user)) return json({error: 'Usuário de 3 a 30 letras ou números, sem espaços.'}, 400);
+      if (!data.google) return json({error: 'Informe o e-mail Google da pessoa.'}, 400);
+    }
+    if (typeof data.google === 'string' && data.google.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.google.trim())) return json({error: 'E-mail Google inválido.'}, 400);
+    const change = {type: action, user, permissions, at: Date.now()};
+    if (typeof data.google === 'string') change.google = data.google;
+    if (data.newUser) change.newUser = String(data.newUser).trim();
+    if (data.email) change.email = String(data.email);
+    await fsCall('POST', '/alteracoes', {fields: {json: {stringValue: JSON.stringify(change)}}});
+    s.adminPending = [...(s.adminPending || []), change]; saveState();
+    const L = await adminListing(s);
+    return json(path === '/api/master/permissions' ? {ok: true, user, permissions, passwordChanged: false} : L);
+  } catch (e) { return json({error: 'Não consegui salvar na nuvem agora. Tente de novo.'}, 503); }
+}
+
 async function handle(request) {
   const url = new URL(request.url);
   if (url.origin !== location.origin) return fetch(request);
@@ -254,6 +309,8 @@ async function handle(request) {
   if (path === '/api/database-activity') return new Response(null, {status: 204});
   if (path === '/balito-leitor/api/drama/jobs' && request.method === 'GET') return json({items: []});
   if (path === '/balito-leitor/api/voices' && request.method === 'GET' && !s.entries[path]) return json({voices: []});
+  // Painel de gestão ao vivo (Firebase).
+  { const live = await adminLive(s, path, request); if (live) return live; }
   // Reader ao vivo: biblioteca, capas, progresso e áudio vêm do Firebase + Drive.
   if (path.startsWith('/balito-leitor/api/')) { const live = await readerLive(s, path, url, request); if (live) return live; }
   // Audiolivros: tocam direto do Drive.
