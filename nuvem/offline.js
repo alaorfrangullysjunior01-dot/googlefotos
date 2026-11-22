@@ -44,7 +44,6 @@
   function ready(f) { document.body ? f() : addEventListener('DOMContentLoaded', f); }
   ready(function () {
     var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
-    var b = document.createElement('div'); b.className = 'bn-badge'; b.textContent = '☁ Modo nuvem · PC desligado'; document.body.appendChild(b);
   });
 
   function modal(title, text, button, action) {
