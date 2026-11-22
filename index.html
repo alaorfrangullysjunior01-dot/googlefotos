@@ -9,7 +9,7 @@
 <body>
 <p id="m">Abrindo o Balitu Database…</p>
 <script>
-// Abre o site no PC; se o PC estiver desligado, vai para os audiolivros na nuvem.
+// Abre o site no PC; se o PC estiver desligado, vai para o Balitu Database na nuvem (balitudatabase.github.io).
 var pcOnline = function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})};
 function primeiro(lista){return new Promise(function(ok,no){var falhas=0;lista.forEach(function(p){p.then(ok,function(){if(++falhas===lista.length)no()})})})}
 fetch('destino.txt?' + Date.now(), {cache: 'no-store'})
@@ -20,7 +20,7 @@ fetch('destino.txt?' + Date.now(), {cache: 'no-store'})
     return primeiro([pcOnline(url), pcOnline('http://127.0.0.1:8793')]);
   })
   .then(function (url) { location.replace(url); })
-  .catch(function () { location.replace('nuvem/'); });
+  .catch(function () { location.replace('https://balitudatabase.github.io/'); });
 </script>
 </body>
 </html>
