@@ -190,6 +190,7 @@ async function readerLive(s, path, url, request) {
   try {
     if (path === '/balito-leitor/api/library' && request.method === 'GET') {
       const [books, prog] = await Promise.all([booksLive(), progressLive(s)]);
+      if (!books.size) return null; // catálogo ainda não chegou: usa a cópia do PC
       const shared = await Promise.all([...books.values()].map(b => liveItem(s, b, prog.get(b.id) || {})));
       shared.sort((a, b) => b.created - a.created);
       // Leituras pessoais (texto em áudio) continuam vindo do PC.
