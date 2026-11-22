@@ -248,6 +248,12 @@ async function handle(request) {
   const isNav = request.mode === 'navigate';
   if (!s) return isNav ? Response.redirect('/googlefotos/nuvem/?volta=' + encodeURIComponent(path + url.search), 302) : offline(401);
 
+  // Endereços que o site monta como "/api" + "/x" ficam com o prefixo da nuvem repetido no meio.
+  if (path.includes(BASE)) path = path.split(BASE).join('');
+  // Chamadas internas que só fazem sentido no PC: respondem em silêncio (sem aviso na tela).
+  if (path === '/api/database-activity') return new Response(null, {status: 204});
+  if (path === '/balito-leitor/api/drama/jobs' && request.method === 'GET') return json({items: []});
+  if (path === '/balito-leitor/api/voices' && request.method === 'GET' && !s.entries[path]) return json({voices: []});
   // Reader ao vivo: biblioteca, capas, progresso e áudio vêm do Firebase + Drive.
   if (path.startsWith('/balito-leitor/api/')) { const live = await readerLive(s, path, url, request); if (live) return live; }
   // Audiolivros: tocam direto do Drive.
