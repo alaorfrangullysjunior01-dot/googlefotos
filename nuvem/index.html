@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Balitu Database · modo nuvem</title>
+<meta name="theme-color" content="#0c1125">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:radial-gradient(circle at 85% 0,#692b54 0,transparent 38%),radial-gradient(circle at 0 100%,#22336b 0,transparent 40%),linear-gradient(145deg,#0c1125,#191238 60%,#0c1125);color:#fff;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.box{width:min(100%,420px);text-align:center;background:#ffffff0f;border:1px solid #ffffff1f;border-radius:22px;padding:30px 24px;box-shadow:0 20px 60px #0006}
+h1{font-size:24px;margin:8px 0 6px}p{color:#c5c1dc;margin:0 0 22px}
+button{border:0;border-radius:99px;padding:12px 24px;font:inherit;font-weight:700;color:#fff;background:linear-gradient(135deg,#ff4b62,#9c4dff);cursor:pointer}
+.msg{margin-top:16px;color:#ffd5db;min-height:22px;font-size:14px}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:99px;background:#2ad1a11f;color:#7ff0cc;border:1px solid #2ad1a155}
+</style>
+</head>
+<body>
+<div class="box">
+  <span class="tag">MODO NUVEM</span>
+  <h1>Balitu Database</h1>
+  <p>O PC do servidor está desligado agora. Entre com a sua conta Google para usar o Balitu Database na nuvem. Os audiolivros continuam tocando.</p>
+  <button id="go">Entrar com Google</button>
+  <div class="msg" id="msg"></div>
+</div>
+<script>
+'use strict';
+const CLIENT_ID='330955968953-hkm76a032m98apcoidf3jc00m7qm15r7.apps.googleusercontent.com';
+const SCOPE='https://www.googleapis.com/auth/drive.readonly openid email';
+const API='https://www.googleapis.com/drive/v3/files';
+const BASE='/googlefotos/nuvem/app';
+const msg=t=>document.getElementById('msg').textContent=t;
+const volta=(()=>{const v=new URLSearchParams(location.search).get('volta')||'/';return /^\/(?!\/)[^\\\s]*$/.test(v)?v:'/'})();
+let client;
+function token(){return new Promise((ok,no)=>{if(!window.google?.accounts?.oauth2)return no(new Error('O Google ainda está carregando, tente de novo.'));
+ client=client||google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:r=>r.error?client._no(new Error('Login cancelado.')):client._ok(r),error_callback:()=>client._no(new Error('Login cancelado.'))});
+ client._ok=ok;client._no=no;client.requestAccessToken({prompt:localStorage.getItem('bal-nuvem-ok')?'':'consent'})})}
+async function drive(tok,path){const r=await fetch(API+path,{headers:{Authorization:'Bearer '+tok}});if(!r.ok)throw new Error('Drive '+r.status);return r}
+async function find(tok,name){const q=encodeURIComponent(`name='${name}' and trashed=false`);const j=await (await drive(tok,`?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`)).json();return j.files?.[0]?.id||null}
+async function getJson(tok,name){const id=await find(tok,name);if(!id)return null;return (await drive(tok,'/'+id+'?alt=media')).json()}
+async function entrar(){
+ const btn=document.getElementById('go');btn.disabled=true;
+ try{
+  msg('Abrindo o Google…');const t=await token();localStorage.setItem('bal-nuvem-ok','1');
+  const tok=t.access_token,tokenExp=Date.now()+(t.expires_in-60)*1000;
+  msg('Conferindo a sua conta…');
+  const me=await (await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tok}})).json();
+  const email=String(me.email||'').toLowerCase();
+  const indice=await getJson(tok,'balitu-espelho-indice.json');
+  if(!indice){msg('Esta conta Google ('+email+') ainda não tem acesso ao Balitu Database na nuvem.');btn.disabled=false;return}
+  const conta=indice.contas.find(c=>c.emails.includes(email));
+  if(!conta){msg('A conta '+email+' não está cadastrada no Balitu Database.');btn.disabled=false;return}
+  msg('Carregando o seu Balitu Database…');
+  const [man,blobs,cat]=await Promise.all([getJson(tok,'balitu-espelho-'+conta.id+'.json'),getJson(tok,'balitu-espelho-blobs.json'),getJson(tok,'catalogo.json')]);
+  if(!man){msg('Não encontrei a cópia da sua conta. Tente mais tarde.');btn.disabled=false;return}
+  const reg=await navigator.serviceWorker.register('sw.js',{scope:'/googlefotos/nuvem/'});
+  const sw=(await navigator.serviceWorker.ready).active;
+  await new Promise(ok=>{navigator.serviceWorker.addEventListener('message',e=>e.data?.type==='ok'&&ok(),{once:true});sw.postMessage({type:'estado',state:{token:tok,tokenExp,user:conta.user,entries:man.entries,blobs:blobs||{},books:cat?.books||[],created:man.created}})});
+  location.replace(BASE+volta);
+ }catch(e){msg(e.message||'Não foi possível entrar.');btn.disabled=false}
+}
+document.getElementById('go').onclick=entrar;
+if(!('serviceWorker' in navigator)){msg('Este navegador não suporta o modo nuvem. Use o Chrome, Edge ou Safari atualizados.');document.getElementById('go').disabled=true}
+</script>
+</body>
+</html>
