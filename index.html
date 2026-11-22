@@ -11,9 +11,14 @@
 <script>
 // Abre o site no PC; se o PC estiver desligado, vai para os audiolivros na nuvem.
 var pcOnline = function(d){return new Promise(function(ok,no){var i=new Image(),t=setTimeout(function(){i.src='';no()},8000);i.onload=function(){clearTimeout(t);ok(d)};i.onerror=function(){clearTimeout(t);no()};i.src=d+'/logo-backup.svg?'+Date.now()})};
+function primeiro(lista){return new Promise(function(ok,no){var falhas=0;lista.forEach(function(p){p.then(ok,function(){if(++falhas===lista.length)no()})})})}
 fetch('destino.txt?' + Date.now(), {cache: 'no-store'})
   .then(function (r) { return r.text(); })
-  .then(function (t) { return pcOnline(t.trim().replace(/\/+$/, '')); })
+  .then(function (t) {
+    var url = t.trim().replace(/\/+$/, '');
+    // No proprio PC o endereco publico nao volta para a mesma maquina: usa o local.
+    return primeiro([pcOnline(url), pcOnline('http://127.0.0.1:8793')]);
+  })
   .then(function (url) { location.replace(url); })
   .catch(function () { location.replace('audiolivros.html'); });
 </script>
